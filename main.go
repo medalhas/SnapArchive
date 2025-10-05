@@ -1,20 +1,51 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 )
 
+// OverwriteBehavior defines how to handle file conflicts
+type OverwriteBehavior int
+
+const (
+	Skip OverwriteBehavior = iota
+	Overwrite
+	Rename
+)
+
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <source_folder> <dest_folder>\n", os.Args[0])
+	var overwriteMode string
+	flag.StringVar(&overwriteMode, "overwrite", "skip", "Behavior when file exists: 'skip', 'overwrite', or 'rename'")
+	flag.Parse()
+
+	// Validate overwrite mode
+	var behavior OverwriteBehavior
+	switch overwriteMode {
+	case "skip":
+		behavior = Skip
+	case "overwrite":
+		behavior = Overwrite
+	case "rename":
+		behavior = Rename
+	default:
+		fmt.Fprintf(os.Stderr, "Error: Invalid overwrite mode '%s'. Valid options: skip, overwrite, rename\n", overwriteMode)
 		os.Exit(1)
 	}
 
-	sourceDir := os.Args[1]
-	destDir := os.Args[2]
+	args := flag.Args()
+	if len(args) != 2 {
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] <source_folder> <dest_folder>\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	sourceDir := args[0]
+	destDir := args[1]
 
 	if _, err := os.Stat(sourceDir); os.IsNotExist(err) {
 		fmt.Fprintf(os.Stderr, "Error: Source directory '%s' does not exist\n", sourceDir)
@@ -26,9 +57,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Organizing files from '%s' to '%s'...\n", sourceDir, destDir)
+	fmt.Printf("Organizing files from '%s' to '%s' (overwrite mode: %s)...\n", sourceDir, destDir, overwriteMode)
 
-	if err := organizeFiles(sourceDir, destDir); err != nil {
+	if err := organizeFiles(sourceDir, destDir, behavior); err != nil {
 		fmt.Fprintf(os.Stderr, "Error organizing files: %v\n", err)
 		os.Exit(1)
 	}
@@ -38,7 +69,7 @@ func main() {
 
 // organizeFiles recursively walks through the source directory and copies files
 // to the destination directory organized by year and month
-func organizeFiles(sourceDir, destDir string) error {
+func organizeFiles(sourceDir, destDir string, behavior OverwriteBehavior) error {
 	return filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -50,7 +81,7 @@ func organizeFiles(sourceDir, destDir string) error {
 
 		modifiedTime := info.ModTime()
 		year := modifiedTime.Format("2006")
-		month := modifiedTime.Format("01")
+		month := modifiedTime.Format("2006-01-02")
 
 		destPath := filepath.Join(destDir, year, month)
 		if err := os.MkdirAll(destPath, 0755); err != nil {
@@ -60,13 +91,26 @@ func organizeFiles(sourceDir, destDir string) error {
 		fileName := info.Name()
 		destFile := filepath.Join(destPath, fileName)
 
-		destFile = getUniqueFileName(destFile)
+		// Handle file conflicts based on behavior
+		if _, err := os.Stat(destFile); err == nil {
+			switch behavior {
+			case Skip:
+				fmt.Printf("Skipped (file exists): %s -> %s\n", path, destFile)
+				return nil
+			case Overwrite:
+				fmt.Printf("Overwriting: %s -> %s\n", path, destFile)
+			case Rename:
+				destFile = getUniqueFileName(destFile)
+				fmt.Printf("Renamed and copied: %s -> %s\n", path, destFile)
+			}
+		} else {
+			fmt.Printf("Copied: %s -> %s\n", path, destFile)
+		}
 
 		if err := copyFile(path, destFile); err != nil {
 			return fmt.Errorf("failed to copy %s to %s: %v", path, destFile, err)
 		}
 
-		fmt.Printf("Copied: %s -> %s\n", path, destFile)
 		return nil
 	})
 }
