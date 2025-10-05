@@ -1,7 +1,7 @@
 # SnapArchive
 
 An application that recursively reads files from a source directory and copies them to a destination directory organized by year and month based on the file's modification time.
-Mainly to organize my photos, but can work on any type of filesg
+Mainly to organize my photos, but can work on any type of files.
 
 ## Features
 
