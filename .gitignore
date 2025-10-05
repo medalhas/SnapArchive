@@ -19,6 +19,9 @@ snaparchive
 # Dependency directories
 vendor/
 
+# Release artifacts
+dist/
+
 # IDE files
 .vscode/
 .idea/

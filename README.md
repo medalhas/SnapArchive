@@ -62,7 +62,16 @@ organized_photos/
         └── christmas.cr3
 ```
 
-## Building
+## Installation
+
+### Via Homebrew (macOS/Linux)
+
+```bash
+brew tap medalhas/tools
+brew install snaparchive
+```
+
+### Build from Source
 
 To build the application:
 
