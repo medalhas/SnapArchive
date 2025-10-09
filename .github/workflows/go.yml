@@ -1,4 +1,4 @@
-# This workflow will build a golang project
+# This workflow will build a golang project and create releases
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 
 name: SnapArchive
@@ -6,20 +6,70 @@ name: SnapArchive
 on:
   push:
     branches: [ "main" ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ "main" ]
 
-jobs:
+permissions:
+  contents: write
 
+jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.25.1'
+        go-version: '1.21'
 
-    - name: Build
-      run: go build -o snaparchive main.go 
+    - name: Build for Linux
+      run: |
+        GOOS=linux GOARCH=amd64 go build -o snaparchive-linux-amd64 main.go
+        GOOS=linux GOARCH=arm64 go build -o snaparchive-linux-arm64 main.go
+
+    - name: Build for macOS
+      run: |
+        GOOS=darwin GOARCH=amd64 go build -o snaparchive-darwin-amd64 main.go
+        GOOS=darwin GOARCH=arm64 go build -o snaparchive-darwin-arm64 main.go
+
+    - name: Build for Windows
+      run: |
+        GOOS=windows GOARCH=amd64 go build -o snaparchive-windows-amd64.exe main.go
+        GOOS=windows GOARCH=arm64 go build -o snaparchive-windows-arm64.exe main.go
+
+    - name: Create archives
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        # Create Linux archives
+        tar -czf snaparchive-linux-amd64.tar.gz snaparchive-linux-amd64
+        tar -czf snaparchive-linux-arm64.tar.gz snaparchive-linux-arm64
+        
+        # Create macOS archives
+        tar -czf snaparchive-darwin-amd64.tar.gz snaparchive-darwin-amd64
+        tar -czf snaparchive-darwin-arm64.tar.gz snaparchive-darwin-arm64
+        
+        # Create Windows archives
+        zip snaparchive-windows-amd64.zip snaparchive-windows-amd64.exe
+        zip snaparchive-windows-arm64.zip snaparchive-windows-arm64.exe
+
+    - name: Generate checksums
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        sha256sum *.tar.gz *.zip > checksums.txt
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          *.tar.gz
+          *.zip
+          checksums.txt
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
