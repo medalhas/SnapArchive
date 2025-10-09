@@ -4,11 +4,18 @@ test_dest/
 
 # Go build artifacts
 snaparchive
+snaparchive-*
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+
+# Release artifacts
+*.tar.gz
+*.zip
+checksums.txt
+dist/
 
 # Go test files
 *.test
@@ -18,9 +25,6 @@ snaparchive
 
 # Dependency directories
 vendor/
-
-# Release artifacts
-dist/
 
 # IDE files
 .vscode/
